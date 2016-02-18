@@ -1,5 +1,7 @@
 # datomic-seed
 
+![](https://clojars.org/net.phobot.datomic/seed/latest-version.svg)
+
 A Clojure program designed to load seed data for testing from edn files into a 
 Datomic database. The edn files are preprocessed to allow for creating 
 relationships between entities using keywords rather than numeric tempids.
