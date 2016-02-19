@@ -57,8 +57,7 @@
       :default)
     (transact-seed-data connection seed-data-resource-path logger-fn))
 
-(defn recreate-and-seed-database
-  ([db-url migration-path seed-data-resource-path logger-fn]
+(defn recreate-and-seed-database [db-url migration-path seed-data-resource-path logger-fn]
     (if (some? migration-path)
       (do
         (logger-fn "Full path of migration directory:" (-> migration-path clojure.java.io/file .getAbsolutePath))
