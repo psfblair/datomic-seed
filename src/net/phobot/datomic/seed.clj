@@ -41,10 +41,9 @@
       (->> (io/reader filepath)
            (java.io.PushbackReader.)  
            (clojure.edn/read { :readers readers })))))
-  
-(defn transact-seed-data [datastore-uri seed-data-path logger-fn]
-  (let [connection (datomic/connect datastore-uri)
-        seed-files (edn-lister/list-edn-files seed-data-path)
+
+(defn transact-seed-data [connection seed-data-path logger-fn]
+  (let [seed-files (edn-lister/list-edn-files seed-data-path)
         symbol-id-table (atom {})
         symbol-partition-table (atom {})
         reader-fn (partial read-seed-data-file symbol-id-table symbol-partition-table logger-fn)
@@ -52,15 +51,19 @@
         edn-data (clojure.edn/read-string {:readers *data-readers*} preprocessed-edn)]
     (datomic/transact connection edn-data)))
 
-(defn seed-database [datastore-uri migration-path seed-data-resource-path logger-fn]
-  (if (some? migration-path)
-    (do
-      (logger-fn "Full path of migration directory:" (-> migration-path clojure.java.io/file .getAbsolutePath))
-      (logger-fn "Deleting database:" datastore-uri)
-      (datomic/delete-database datastore-uri)
-      (migrator/run-migrations datastore-uri migration-path logger-fn))
-    :default)
-  (transact-seed-data datastore-uri seed-data-resource-path logger-fn))
+(defn seed-database 
+  ([db-url migration-path seed-data-resource-path logger-fn]
+    (let [connection (datomic/connect db-url)]
+      (seed-database db-url connection migration-path seed-data-resource-path logger-fn)))
+  ([db-url connection migration-path seed-data-resource-path logger-fn]
+    (if (some? migration-path)
+      (do
+        (logger-fn "Full path of migration directory:" (-> migration-path clojure.java.io/file .getAbsolutePath))
+        (logger-fn "Deleting database:" db-url)
+        (datomic/delete-database db-url)
+        (migrator/run-migrations connection migration-path logger-fn))
+      :default)
+    (transact-seed-data connection seed-data-resource-path logger-fn)))
 
 (def cli-options
   [ ["-d" "--data PATH" "Path of seed data files" :default "seed-data"]
@@ -97,11 +100,11 @@
       errors (exit 1 (error-msg errors))
       (empty? arguments) (exit 1 (usage summary))
       :else 
-        (let [datastore (nth arguments 0)
+        (let [db-url (nth arguments 0)
               migration-path (:schema-dir options)
               seed-data-path (:data options)
               log-fn #(apply println %&)] 
           (do
             (log-fn "Full path of seed data directory:" (-> seed-data-path clojure.java.io/file .getAbsolutePath))
-            (seed-database datastore migration-path seed-data-path log-fn)
+            (seed-database db-url migration-path seed-data-path log-fn)
             (datomic/shutdown true))))))
