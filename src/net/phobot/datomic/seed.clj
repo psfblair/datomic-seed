@@ -51,19 +51,23 @@
         edn-data (clojure.edn/read-string {:readers *data-readers*} preprocessed-edn)]
     (datomic/transact connection edn-data)))
 
-(defn seed-database 
+(defn seed-database [connection migration-path seed-data-resource-path logger-fn]
+    (if (some? migration-path)
+      (do (migrator/run-migrations connection migration-path logger-fn))
+      :default)
+    (transact-seed-data connection seed-data-resource-path logger-fn))
+
+(defn recreate-and-seed-database
   ([db-url migration-path seed-data-resource-path logger-fn]
-    (let [connection (datomic/connect db-url)]
-      (seed-database db-url connection migration-path seed-data-resource-path logger-fn)))
-  ([db-url connection migration-path seed-data-resource-path logger-fn]
     (if (some? migration-path)
       (do
         (logger-fn "Full path of migration directory:" (-> migration-path clojure.java.io/file .getAbsolutePath))
         (logger-fn "Deleting database:" db-url)
-        (datomic/delete-database db-url)
-        (migrator/run-migrations connection migration-path logger-fn))
+        (datomic/delete-database db-url))
+        ; Migrations will create the database if it doesn't already exist.
       :default)
-    (transact-seed-data connection seed-data-resource-path logger-fn)))
+    (let [connection (datomic/connect db-url)]
+      (seed-database connection migration-path seed-data-resource-path logger-fn)))
 
 (def cli-options
   [ ["-d" "--data PATH" "Path of seed data files" :default "seed-data"]
@@ -106,5 +110,5 @@
               log-fn #(apply println %&)] 
           (do
             (log-fn "Full path of seed data directory:" (-> seed-data-path clojure.java.io/file .getAbsolutePath))
-            (seed-database db-url migration-path seed-data-path log-fn)
+            (recreate-and-seed-database db-url migration-path seed-data-path log-fn)
             (datomic/shutdown true))))))

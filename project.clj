@@ -1,4 +1,4 @@
-(defproject net.phobot.datomic/seed "2.0.0"
+(defproject net.phobot.datomic/seed "3.0.0"
   :description "Tool for loading seed data for testing into Datomic databases."
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/tools.cli "0.3.3"]
